@@ -3,12 +3,13 @@ import React, { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { FileText, Upload, File } from "lucide-react";
+import { validateFileType, validateFileSize, formatFileSize, extractFileContent } from "@/utils/fileUtils";
 
 type FileType = {
   name: string;
   type: string;
   size: number;
-  content?: any;
+  content?: string;
 };
 
 interface FileUploadProps {
@@ -18,6 +19,7 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<FileType | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const { toast } = useToast();
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -30,9 +32,44 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
     }
   }, []);
 
+  const processFile = async (file: File) => {
+    setIsProcessing(true);
+    try {
+      const content = await extractFileContent(file);
+      const fileData: FileType = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        content: content
+      };
+      setSelectedFile(fileData);
+      setIsProcessing(false);
+    } catch (error) {
+      console.error("Error processing file:", error);
+      toast({
+        title: "Error processing file",
+        description: "There was a problem reading your file.",
+        variant: "destructive",
+      });
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      if (validateFile(file)) {
+        processFile(file);
+      }
+    }
+  }, [toast]);
+
   const validateFile = (file: File): boolean => {
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
-    if (!validTypes.includes(file.type)) {
+    if (!validateFileType(file)) {
       toast({
         title: "Invalid file type",
         description: "Please upload a PDF, DOCX, or TXT file.",
@@ -41,8 +78,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       return false;
     }
     
-    // Check file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
+    if (!validateFileSize(file)) {
       toast({
         title: "File too large",
         description: "File size should be less than 10MB.",
@@ -54,44 +90,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
     return true;
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      if (validateFile(file)) {
-        const fileData: FileType = {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        };
-        setSelectedFile(fileData);
-      }
-    }
-  }, [toast]);
-
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       if (validateFile(file)) {
-        const fileData: FileType = {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        };
-        setSelectedFile(fileData);
+        processFile(file);
       }
     }
   }, [toast]);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' bytes';
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    else return (bytes / 1048576).toFixed(1) + ' MB';
-  };
 
   const getFileIcon = (fileType: string) => {
     if (fileType.includes('pdf')) {
@@ -157,8 +164,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
               variant="default"
               onClick={handleSubmit}
               className="ml-4 rounded-full"
+              disabled={isProcessing}
             >
-              Continue
+              {isProcessing ? 'Processing...' : 'Continue'}
             </Button>
           </div>
         </div>

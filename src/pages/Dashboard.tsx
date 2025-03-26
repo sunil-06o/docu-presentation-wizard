@@ -9,12 +9,13 @@ import AudienceSelector from "@/components/AudienceSelector";
 import ThemeSelector from "@/components/ThemeSelector";
 import ProcessingView from "@/components/ProcessingView";
 import PresentationPreview from "@/components/PresentationPreview";
+import Header from "@/components/Header";
 
 type FileType = {
   name: string;
   type: string;
   size: number;
-  content?: any;
+  content?: string;
 };
 
 type StepType = "upload" | "customize" | "process" | "preview";
@@ -99,22 +100,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="w-full py-4 px-8 flex items-center justify-between bg-white border-b border-gray-100 shadow-sm">
-        <div className="flex items-center">
-          <Link to="/" className="flex items-center text-gray-600 hover:text-primary transition-colors">
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            <span className="text-sm font-medium">Back to Home</span>
-          </Link>
-        </div>
-        <div className="flex items-center">
-          <span className="text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">Docu<span className="font-light">Slide</span></span>
-        </div>
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon">
-            <Settings className="h-5 w-5" />
-          </Button>
-        </div>
-      </header>
+      <Header showBackButton={true} showSettings={true} />
 
       <main className="flex-grow px-4 md:px-8 lg:px-16 py-8">
         <div className="w-full max-w-5xl mx-auto">
