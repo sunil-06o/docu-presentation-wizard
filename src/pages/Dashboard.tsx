@@ -10,6 +10,8 @@ import ThemeSelector from "@/components/ThemeSelector";
 import ProcessingView from "@/components/ProcessingView";
 import PresentationPreview from "@/components/PresentationPreview";
 import Header from "@/components/Header";
+import { generatePowerPointFile } from "@/utils/fileUtils";
+import { useToast } from "@/hooks/use-toast";
 
 type FileType = {
   name: string;
@@ -27,6 +29,8 @@ const Dashboard = () => {
   const [theme, setTheme] = useState<string>("modern");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
+  const { toast } = useToast();
+  const [generatedSlides, setGeneratedSlides] = useState<any[]>([]);
 
   const handleFileUpload = (uploadedFile: FileType) => {
     setFile(uploadedFile);
@@ -52,8 +56,34 @@ const Dashboard = () => {
   };
 
   const handleDownload = () => {
-    // In a real implementation, this would generate and download the presentation
-    alert("Presentation downloaded successfully!");
+    if (!file || !generatedSlides.length) {
+      toast({
+        title: "No content to download",
+        description: "Please upload a file and process it first.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Generate PowerPoint file
+    const pptxBlob = generatePowerPointFile(generatedSlides, theme, file.name);
+    
+    // Create download link
+    const url = URL.createObjectURL(pptxBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${file.name.split('.')[0]}_presentation.pptx`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up
+    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    toast({
+      title: "Presentation downloaded",
+      description: `${a.download} has been downloaded to your default download location.`,
+    });
   };
 
   const getStepContent = () => {
@@ -99,15 +129,15 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
       <Header showBackButton={true} showSettings={true} />
 
-      <main className="flex-grow px-4 md:px-8 lg:px-16 py-8">
+      <main className="flex-grow px-4 md:px-8 lg:px-16 py-8 dark:text-gray-100">
         <div className="w-full max-w-5xl mx-auto">
           <div className="mb-12">
-            <h1 className="text-3xl font-bold mb-6">Create Presentation</h1>
+            <h1 className="text-3xl font-bold mb-6 dark:text-white">Create Presentation</h1>
             
-            <div className="w-full bg-white rounded-xl p-2 shadow-sm">
+            <div className="w-full bg-white dark:bg-gray-800 rounded-xl p-2 shadow-sm transition-colors duration-200">
               <div className="w-full flex justify-between items-center relative">
                 {steps.map((step, index) => {
                   const isActive = currentStep === step.key;
@@ -117,7 +147,7 @@ const Dashboard = () => {
                     <React.Fragment key={step.key}>
                       <div 
                         className={`flex flex-col items-center justify-center z-10 transition-all ${
-                          isActive || isPast ? 'text-primary' : 'text-gray-400'
+                          isActive || isPast ? 'text-primary dark:text-primary' : 'text-gray-400 dark:text-gray-500'
                         }`}
                       >
                         <div 
@@ -125,8 +155,8 @@ const Dashboard = () => {
                             isActive 
                               ? 'bg-primary text-white shadow-md' 
                               : isPast 
-                                ? 'bg-primary/20 text-primary' 
-                                : 'bg-gray-100 text-gray-400'
+                                ? 'bg-primary/20 text-primary dark:bg-primary/30' 
+                                : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'
                           }`}
                         >
                           {index + 1}
@@ -137,7 +167,7 @@ const Dashboard = () => {
                       {index < steps.length - 1 && (
                         <div 
                           className={`h-1 flex-grow max-w-32 transition-all ${
-                            isPast ? 'bg-primary' : 'bg-gray-200'
+                            isPast ? 'bg-primary dark:bg-primary' : 'bg-gray-200 dark:bg-gray-700'
                           }`}
                         ></div>
                       )}
@@ -149,7 +179,17 @@ const Dashboard = () => {
           </div>
           
           <div className="mb-8">
-            {getStepContent()}
+            {currentStep === "preview" ? (
+              <PresentationPreview 
+                file={file}
+                audience={audience}
+                theme={theme}
+                onDownload={handleDownload}
+                onSlidesGenerated={setGeneratedSlides}
+              />
+            ) : (
+              getStepContent()
+            )}
           </div>
         </div>
       </main>

@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import SlideRenderer from "./presentation/SlideRenderer";
 import SlideThumbnail from "./presentation/SlideThumbnail";
 import SlideControls from "./presentation/SlideControls";
@@ -11,13 +11,15 @@ interface PresentationPreviewProps {
   audience: string;
   theme: string;
   onDownload: () => void;
+  onSlidesGenerated?: (slides: any[]) => void;
 }
 
 const PresentationPreview: React.FC<PresentationPreviewProps> = ({
   file,
   audience,
   theme,
-  onDownload
+  onDownload,
+  onSlidesGenerated
 }) => {
   const { 
     slides, 
@@ -27,16 +29,22 @@ const PresentationPreview: React.FC<PresentationPreviewProps> = ({
     totalSlides 
   } = usePresentationSlides({ file, audience });
 
+  useEffect(() => {
+    if (slides.length > 0 && onSlidesGenerated) {
+      onSlidesGenerated(slides);
+    }
+  }, [slides, onSlidesGenerated]);
+
   return (
     <div className="w-full max-w-5xl mx-auto animate-fade-in">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold">Presentation Preview</h2>
+        <h2 className="text-2xl font-semibold dark:text-white">Presentation Preview</h2>
         <PresentationActions onDownload={onDownload} />
       </div>
       
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm transition-colors duration-200">
         <div className="mb-4 flex justify-between items-center">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
             <span className="font-medium">{file ? file.name : "Presentation"}</span> • {audience} audience • {theme} theme
           </div>
           
@@ -47,7 +55,7 @@ const PresentationPreview: React.FC<PresentationPreviewProps> = ({
           />
         </div>
         
-        <div className="w-full aspect-[16/9] bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shadow-sm relative">
+        <div className="w-full aspect-[16/9] bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm relative">
           {slides.map((slide, index) => (
             <SlideRenderer 
               key={index}
@@ -59,7 +67,7 @@ const PresentationPreview: React.FC<PresentationPreviewProps> = ({
           ))}
         </div>
         
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
           <div className="flex overflow-x-auto pb-4 gap-3 snap-x">
             {slides.map((slide, index) => (
               <SlideThumbnail

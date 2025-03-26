@@ -95,12 +95,33 @@
   }
 
   .glassmorphism {
-    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-lg;
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-lg dark:bg-gray-900/70 dark:border-gray-800/30;
   }
 
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Dark mode specific styles */
+.dark .slide-bg-modern {
+  @apply bg-gradient-to-br from-blue-950 to-gray-900;
+}
+
+.dark .slide-bg-classic {
+  @apply bg-gray-900;
+}
+
+.dark .slide-bg-minimal {
+  @apply bg-black;
+}
+
+.dark .slide-bg-vibrant {
+  @apply bg-gradient-to-br from-pink-950 to-purple-900;
+}
+
+.dark .slide-bg-corporate {
+  @apply bg-gradient-to-br from-blue-950 to-gray-900;
 }
 
 /* Custom scrollbar */

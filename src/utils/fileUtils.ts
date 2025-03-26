@@ -1,4 +1,3 @@
-
 // Import PDF.js library
 import * as pdfjs from 'pdfjs-dist';
 import { getDocument } from 'pdfjs-dist';
@@ -132,8 +131,8 @@ export const generateSlidesFromContent = (content: string, audience: string): an
   // Extract title from first line or use filename
   const title = lines[0] || "Document Presentation";
   
-  // Extract subtitle from second line or create default
-  const subtitle = lines[1] || "Auto-generated Presentation";
+  // Extract subtitle from second line or create a subtitle based on audience
+  const subtitle = lines[1] || `Prepared for ${audience.charAt(0).toUpperCase() + audience.slice(1)} Audience`;
   
   // Group remaining lines into content sections
   const contentSections: string[][] = [];
@@ -145,7 +144,7 @@ export const generateSlidesFromContent = (content: string, audience: string): an
     const line = lines[i].trim();
     
     // Try to identify potential section headers
-    if (line.length < 50 && (line.endsWith(':') || !line.includes(' '))) {
+    if ((line.length < 50 && (line.endsWith(':') || !line.includes(' '))) || currentSection.length >= 4) {
       if (currentSection.length > 0) {
         contentSections.push([...currentSection]);
         currentSection = [];
@@ -153,17 +152,16 @@ export const generateSlidesFromContent = (content: string, audience: string): an
     }
     
     currentSection.push(line);
-    
-    // Create a new section every few lines to avoid too much content on one slide
-    if (currentSection.length >= 4) {
-      contentSections.push([...currentSection]);
-      currentSection = [];
-    }
   }
   
   // Add any remaining content as the final section
   if (currentSection.length > 0) {
     contentSections.push(currentSection);
+  }
+  
+  // Create additional sections if we don't have enough
+  while (contentSections.length < 3) {
+    contentSections.push(["Additional content", "This section contains supplementary information", "Relevant to the main topic", "For further reference"]);
   }
   
   // Generate slides based on the content
@@ -175,25 +173,32 @@ export const generateSlidesFromContent = (content: string, audience: string): an
     }
   ];
   
-  // Add agenda slide if we have multiple content sections
-  if (contentSections.length > 1) {
-    slides.push({
-      type: "agenda",
-      title: "Agenda",
-      items: contentSections.map((section, index) => {
-        return section[0].replace(':', '') || `Section ${index + 1}`;
-      }).slice(0, 5) // Limit to 5 agenda items
-    });
-  }
+  // Add agenda slide
+  slides.push({
+    type: "agenda",
+    title: "Agenda",
+    items: contentSections.map((section, index) => {
+      return section[0].replace(':', '') || `Section ${index + 1}`;
+    }).slice(0, 5)
+  });
   
   // Add content slides
   contentSections.forEach((section, index) => {
     slides.push({
       type: "content",
       title: section[0].replace(':', '') || `Section ${index + 1}`,
-      content: section.slice(1, 5) // Limit to 4 content points per slide
+      content: section.slice(1, 5) 
     });
   });
+  
+  // Add a chart slide if we have space
+  if (slides.length < 5) {
+    slides.push({
+      type: "chart",
+      title: "Data Visualization",
+      chartType: "bar"
+    });
+  }
   
   // Add a thank you slide
   slides.push({
@@ -203,4 +208,34 @@ export const generateSlidesFromContent = (content: string, audience: string): an
   });
   
   return slides;
+};
+
+// Function to generate a PowerPoint file (in a real implementation)
+export const generatePowerPointFile = (slides: any[], theme: string, fileName: string): Blob => {
+  // This is a simplified version - in a real implementation, you would use a library like pptxgenjs
+  
+  // For demonstration purposes, we'll create a text file with the content
+  const content = slides.map(slide => {
+    let slideContent = `=== ${slide.type.toUpperCase()} SLIDE ===\n`;
+    
+    if (slide.title) {
+      slideContent += `Title: ${slide.title}\n`;
+    }
+    
+    if (slide.subtitle) {
+      slideContent += `Subtitle: ${slide.subtitle}\n`;
+    }
+    
+    if (slide.content) {
+      slideContent += `Content: ${slide.content.join(', ')}\n`;
+    }
+    
+    if (slide.items) {
+      slideContent += `Items: ${slide.items.join(', ')}\n`;
+    }
+    
+    return slideContent;
+  }).join('\n\n');
+  
+  return new Blob([content], { type: 'text/plain' });
 };
