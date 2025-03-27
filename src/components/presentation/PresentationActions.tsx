@@ -7,10 +7,14 @@ import { useTheme } from "@/hooks/use-theme";
 
 interface PresentationActionsProps {
   onDownload: () => void;
+  onEdit?: () => void;
+  isEditing?: boolean;
 }
 
 const PresentationActions: React.FC<PresentationActionsProps> = ({
-  onDownload
+  onDownload,
+  onEdit,
+  isEditing = false
 }) => {
   const { toast } = useToast();
   const { theme, toggleTheme } = useTheme();
@@ -19,13 +23,6 @@ const PresentationActions: React.FC<PresentationActionsProps> = ({
     toast({
       title: "Feature in development",
       description: "View original document feature is coming soon.",
-    });
-  };
-
-  const handleEdit = () => {
-    toast({
-      title: "Edit mode",
-      description: "Edit mode feature is coming soon.",
     });
   };
 
@@ -60,15 +57,17 @@ const PresentationActions: React.FC<PresentationActionsProps> = ({
         <FileText className="h-4 w-4 mr-1" />
         View Original
       </Button>
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="flex items-center gap-1"
-        onClick={handleEdit}
-      >
-        <Edit className="h-4 w-4 mr-1" />
-        Edit
-      </Button>
+      {onEdit && (
+        <Button 
+          variant={isEditing ? "default" : "outline"}
+          size="sm" 
+          className="flex items-center gap-1"
+          onClick={onEdit}
+        >
+          <Edit className="h-4 w-4 mr-1" />
+          {isEditing ? "Editing Mode" : "Edit"}
+        </Button>
+      )}
       <Button 
         variant="outline" 
         size="sm" 

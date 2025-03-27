@@ -55,6 +55,10 @@ const Dashboard = () => {
     }, 200);
   };
 
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme);
+  };
+
   const handleDownload = () => {
     if (!file || !generatedSlides.length) {
       toast({
@@ -113,7 +117,9 @@ const Dashboard = () => {
             file={file}
             audience={audience}
             theme={theme}
+            onThemeChange={handleThemeChange}
             onDownload={handleDownload}
+            onSlidesGenerated={setGeneratedSlides}
           />
         );
       default:
@@ -184,6 +190,7 @@ const Dashboard = () => {
                 file={file}
                 audience={audience}
                 theme={theme}
+                onThemeChange={handleThemeChange}
                 onDownload={handleDownload}
                 onSlidesGenerated={setGeneratedSlides}
               />

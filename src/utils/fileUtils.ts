@@ -1,6 +1,7 @@
 // Import PDF.js library
 import * as pdfjs from 'pdfjs-dist';
 import { getDocument } from 'pdfjs-dist';
+import { extractPdfContentWithLimit, extractKeyPoints } from './pdfExtractor';
 
 // Set the worker source
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -38,22 +39,15 @@ export const getFileTypeFromExtension = (extension: string): string => {
   return extensionMap[extension.toLowerCase()] || 'Unknown File Type';
 };
 
-// Function to extract text from PDF files using PDF.js
+// Function to extract text from PDF files using our improved extractor
 const extractPdfContent = async (file: File): Promise<string> => {
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    const extractedPages = await extractPdfContentWithLimit(file, 250);
     let fullText = '';
     
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      fullText += pageText + '\n\n';
-    }
+    extractedPages.forEach(page => {
+      fullText += `--- Page ${page.pageNumber} ---\n${page.text}\n\n`;
+    });
     
     return fullText || `[PDF content extraction completed: ${file.name}]`;
   } catch (error) {
@@ -123,7 +117,7 @@ export const extractFileContent = async (file: File): Promise<string> => {
   }
 };
 
-// New function to generate slides from content
+// New function to generate slides from content with character limits
 export const generateSlidesFromContent = (content: string, audience: string): any[] => {
   // Split content into lines and filter out empty ones
   const lines = content.split('\n').filter(line => line.trim().length > 0);
@@ -134,7 +128,13 @@ export const generateSlidesFromContent = (content: string, audience: string): an
   // Extract subtitle from second line or create a subtitle based on audience
   const subtitle = lines[1] || `Prepared for ${audience.charAt(0).toUpperCase() + audience.slice(1)} Audience`;
   
-  // Group remaining lines into content sections
+  // Process content with character limits (max 250 chars per PDF page extract)
+  let processedContent = content;
+  if (processedContent.length > 250) {
+    processedContent = processedContent.substring(0, 250) + "...";
+  }
+  
+  // Group remaining lines into content sections with character limits
   const contentSections: string[][] = [];
   let currentSection: string[] = [];
   
@@ -142,6 +142,9 @@ export const generateSlidesFromContent = (content: string, audience: string): an
   // In a real implementation, this would use more sophisticated NLP
   for (let i = 2; i < lines.length; i++) {
     const line = lines[i].trim();
+    
+    // Limit each content item to 150 characters
+    const limitedLine = line.length > 150 ? line.substring(0, 147) + "..." : line;
     
     // Try to identify potential section headers
     if ((line.length < 50 && (line.endsWith(':') || !line.includes(' '))) || currentSection.length >= 4) {
@@ -151,7 +154,7 @@ export const generateSlidesFromContent = (content: string, audience: string): an
       }
     }
     
-    currentSection.push(line);
+    currentSection.push(limitedLine);
   }
   
   // Add any remaining content as the final section
@@ -168,8 +171,8 @@ export const generateSlidesFromContent = (content: string, audience: string): an
   const slides: any[] = [
     {
       type: "title",
-      title: title,
-      subtitle: subtitle,
+      title: title.substring(0, 150),
+      subtitle: subtitle.substring(0, 150),
     }
   ];
   
@@ -178,7 +181,8 @@ export const generateSlidesFromContent = (content: string, audience: string): an
     type: "agenda",
     title: "Agenda",
     items: contentSections.map((section, index) => {
-      return section[0].replace(':', '') || `Section ${index + 1}`;
+      const headerText = section[0].replace(':', '') || `Section ${index + 1}`;
+      return headerText.substring(0, 150);
     }).slice(0, 5)
   });
   
@@ -186,8 +190,8 @@ export const generateSlidesFromContent = (content: string, audience: string): an
   contentSections.forEach((section, index) => {
     slides.push({
       type: "content",
-      title: section[0].replace(':', '') || `Section ${index + 1}`,
-      content: section.slice(1, 5) 
+      title: (section[0].replace(':', '') || `Section ${index + 1}`).substring(0, 150),
+      content: section.slice(1, 5).map(item => item.substring(0, 150))
     });
   });
   
@@ -206,6 +210,34 @@ export const generateSlidesFromContent = (content: string, audience: string): an
     title: "Thank You",
     subtitle: "Questions & Discussion",
   });
+  
+  // Ensure we have at least 5 slides
+  if (slides.length < 5) {
+    // Add extra content slides if needed
+    const extraSlides = [
+      {
+        type: "content",
+        title: "Additional Information",
+        content: [
+          "This slide contains supplementary content",
+          "Related to the main topic of the presentation",
+          "Providing further context and details",
+          "For a comprehensive understanding"
+        ]
+      },
+      {
+        type: "chart",
+        title: "Data Visualization",
+        chartType: "bar"
+      }
+    ];
+    
+    // Add extra slides until we have at least 5
+    while (slides.length < 5) {
+      // Insert before the thank you slide
+      slides.splice(slides.length - 1, 0, extraSlides[slides.length % 2]);
+    }
+  }
   
   return slides;
 };

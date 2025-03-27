@@ -107,6 +107,7 @@ export function usePresentationSlides({ file, audience }: SlideHookProps) {
 
   return {
     slides,
+    setSlides,
     currentSlide,
     setCurrentSlide,
     navigateSlide,
