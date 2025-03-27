@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { FileText, Upload, File } from "lucide-react";
+import { FileText, Upload, File, Download } from "lucide-react";
 import { validateFileType, validateFileSize, formatFileSize, extractFileContent } from "@/utils/fileUtils";
 
 type FileType = {
@@ -10,6 +10,9 @@ type FileType = {
   type: string;
   size: number;
   content?: string;
+  textFileUrl?: string;
+  textFileName?: string;
+  documentTitle?: string;
 };
 
 interface FileUploadProps {
@@ -35,15 +38,25 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
   const processFile = async (file: File) => {
     setIsProcessing(true);
     try {
-      const content = await extractFileContent(file);
+      const extractionResult = await extractFileContent(file);
       const fileData: FileType = {
         name: file.name,
         type: file.type,
         size: file.size,
-        content: content
+        content: extractionResult.text,
+        textFileUrl: extractionResult.downloadInfo?.url,
+        textFileName: extractionResult.downloadInfo?.fileName,
+        documentTitle: extractionResult.title
       };
       setSelectedFile(fileData);
       setIsProcessing(false);
+      
+      if (extractionResult.downloadInfo) {
+        toast({
+          title: "Text extraction complete",
+          description: "Your document has been processed. You can download the extracted text.",
+        });
+      }
     } catch (error) {
       console.error("Error processing file:", error);
       toast({
@@ -115,11 +128,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       onFileUpload(selectedFile);
     }
   };
+  
+  const handleDownloadExtractedText = () => {
+    if (selectedFile?.textFileUrl) {
+      const a = document.createElement('a');
+      a.href = selectedFile.textFileUrl;
+      a.download = selectedFile.textFileName || 'extracted_text.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Text file downloaded",
+        description: "The extracted text has been downloaded.",
+      });
+    }
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto animate-fade-in">
       <div 
-        className={`drop-area p-12 ${dragActive ? 'active' : ''} bg-white rounded-xl transition-all`}
+        className={`drop-area p-12 ${dragActive ? 'active' : ''} bg-white dark:bg-gray-800 rounded-xl transition-all`}
         onDragEnter={handleDrag}
         onDragOver={handleDrag}
         onDragLeave={handleDrag}
@@ -129,13 +158,13 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
           <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6 animate-pulse-light">
             <Upload className="h-10 w-10 text-primary" />
           </div>
-          <h3 className="text-xl font-semibold mb-3">Upload Document</h3>
-          <p className="text-gray-600 mb-6 max-w-md">
+          <h3 className="text-xl font-semibold mb-3 dark:text-white">Upload Document</h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-md">
             Drag and drop your PDF, DOCX, or TXT file here, or click to browse
           </p>
           
           <label htmlFor="file-upload" className="cursor-pointer">
-            <div className="py-2 px-4 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-700 font-medium">
+            <div className="py-2 px-4 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-200 font-medium">
               Browse Files
             </div>
             <input
@@ -150,24 +179,42 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       </div>
 
       {selectedFile && (
-        <div className="mt-8 bg-white rounded-xl p-6 shadow-sm animate-slide-in">
-          <h3 className="text-lg font-semibold mb-4">Selected File</h3>
-          <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+        <div className="mt-8 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm animate-slide-in">
+          <h3 className="text-lg font-semibold mb-4 dark:text-white">Selected File</h3>
+          <div className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="mr-4">
               {getFileIcon(selectedFile.type)}
             </div>
             <div className="flex-grow">
-              <p className="font-medium text-gray-900 truncate">{selectedFile.name}</p>
-              <p className="text-sm text-gray-500">{formatFileSize(selectedFile.size)}</p>
+              <p className="font-medium text-gray-900 dark:text-white truncate">{selectedFile.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{formatFileSize(selectedFile.size)}</p>
+              {selectedFile.documentTitle && (
+                <p className="text-sm text-primary mt-1">
+                  <span className="font-medium">Detected title:</span> {selectedFile.documentTitle}
+                </p>
+              )}
             </div>
-            <Button
-              variant="default"
-              onClick={handleSubmit}
-              className="ml-4 rounded-full"
-              disabled={isProcessing}
-            >
-              {isProcessing ? 'Processing...' : 'Continue'}
-            </Button>
+            <div className="flex gap-2">
+              {selectedFile.textFileUrl && (
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadExtractedText}
+                  className="ml-2 flex items-center gap-1"
+                  size="sm"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Extracted Text</span>
+                </Button>
+              )}
+              <Button
+                variant="default"
+                onClick={handleSubmit}
+                className="rounded-full"
+                disabled={isProcessing}
+              >
+                {isProcessing ? 'Processing...' : 'Continue'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

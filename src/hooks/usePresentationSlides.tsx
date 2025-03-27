@@ -13,8 +13,8 @@ export function usePresentationSlides({ file, audience }: SlideHookProps) {
   
   useEffect(() => {
     if (file && file.content) {
-      // Generate slides based on actual file content
-      const generatedSlides = generateSlidesFromContent(file.content, audience);
+      // Generate slides based on actual file content and document title
+      const generatedSlides = generateSlidesFromContent(file.content, audience, file.documentTitle);
       
       // Ensure we have at least 5 slides
       if (generatedSlides.length < 5) {

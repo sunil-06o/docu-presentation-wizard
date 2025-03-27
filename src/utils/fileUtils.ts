@@ -1,7 +1,12 @@
 // Import PDF.js library
 import * as pdfjs from 'pdfjs-dist';
 import { getDocument } from 'pdfjs-dist';
-import { extractPdfContentWithLimit, extractKeyPoints } from './pdfExtractor';
+import { 
+  extractPdfContentWithLimit, 
+  extractKeyPoints, 
+  createTextFileFromExtractedContent,
+  getDocumentTitle
+} from './pdfExtractor';
 
 // Set the worker source
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
@@ -40,7 +45,7 @@ export const getFileTypeFromExtension = (extension: string): string => {
 };
 
 // Function to extract text from PDF files using our improved extractor
-const extractPdfContent = async (file: File): Promise<string> => {
+const extractPdfContent = async (file: File): Promise<{ text: string, downloadInfo?: { url: string, fileName: string }, pages: any[] }> => {
   try {
     const extractedPages = await extractPdfContentWithLimit(file, 250);
     let fullText = '';
@@ -49,15 +54,25 @@ const extractPdfContent = async (file: File): Promise<string> => {
       fullText += `--- Page ${page.pageNumber} ---\n${page.text}\n\n`;
     });
     
-    return fullText || `[PDF content extraction completed: ${file.name}]`;
+    // Create downloadable text file
+    const downloadInfo = createTextFileFromExtractedContent(extractedPages, file.name);
+    
+    return {
+      text: fullText || `[PDF content extraction completed: ${file.name}]`,
+      downloadInfo,
+      pages: extractedPages
+    };
   } catch (error) {
     console.error('Error extracting PDF content:', error);
-    return `[Error extracting content from ${file.name}. The PDF might be encrypted, damaged, or uses unsupported features.]`;
+    return {
+      text: `[Error extracting content from ${file.name}. The PDF might be encrypted, damaged, or uses unsupported features.]`,
+      pages: []
+    };
   }
 };
 
 // Function to extract text from DOCX files using JSZip
-const extractDocxContent = async (file: File): Promise<string> => {
+const extractDocxContent = async (file: File): Promise<{ text: string, downloadInfo?: { url: string, fileName: string } }> => {
   try {
     // This is a simplified approach. For production, consider using a dedicated DOCX parser
     const arrayBuffer = await file.arrayBuffer();
@@ -73,20 +88,32 @@ const extractDocxContent = async (file: File): Promise<string> => {
       .map(match => match.replace(/<\/?w:t>/g, ''))
       .join(' ');
     
-    return extractedText || `[DOCX content extracted from ${file.name}]`;
+    // Create downloadable text file
+    const blob = new Blob([extractedText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const textFileName = file.name.split('.')[0] + '_extracted.txt';
+    
+    return {
+      text: extractedText || `[DOCX content extracted from ${file.name}]`,
+      downloadInfo: { url, fileName: textFileName }
+    };
   } catch (error) {
     console.error('Error extracting DOCX content:', error);
-    return `[Error extracting content from ${file.name}. The DOCX file might be damaged or uses unsupported features.]`;
+    return {
+      text: `[Error extracting content from ${file.name}. The DOCX file might be damaged or uses unsupported features.]`
+    };
   }
 };
 
 // Function to extract text from plain text files
-const extractTxtContent = async (file: File): Promise<string> => {
+const extractTxtContent = async (file: File): Promise<{ text: string }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result) {
-        resolve(e.target.result as string);
+        resolve({
+          text: e.target.result as string
+        });
       } else {
         reject(new Error("Failed to read text file"));
       }
@@ -97,33 +124,52 @@ const extractTxtContent = async (file: File): Promise<string> => {
 };
 
 // Main function to extract content from various file types
-export const extractFileContent = async (file: File): Promise<string> => {
+export const extractFileContent = async (file: File): Promise<{
+  text: string,
+  downloadInfo?: { url: string, fileName: string },
+  pages?: any[],
+  title?: string
+}> => {
   try {
+    let result;
+    
     if (file.type === 'application/pdf') {
-      return await extractPdfContent(file);
+      result = await extractPdfContent(file);
     } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-      return await extractDocxContent(file);
+      result = await extractDocxContent(file);
     } else if (file.type === 'text/plain') {
-      return await extractTxtContent(file);
+      result = await extractTxtContent(file);
     } else {
       // Fallback for unsupported file types
       const fileExtension = getFileExtension(file.name);
       const fileType = getFileTypeFromExtension(fileExtension);
-      return `[Unsupported file type: ${fileType}]\n\nFile Details:\nName: ${file.name}\nSize: ${formatFileSize(file.size)}\nType: ${file.type}`;
+      return {
+        text: `[Unsupported file type: ${fileType}]\n\nFile Details:\nName: ${file.name}\nSize: ${formatFileSize(file.size)}\nType: ${file.type}`
+      };
     }
+    
+    // Extract document title
+    const documentTitle = getDocumentTitle(result.text);
+    
+    return {
+      ...result,
+      title: documentTitle
+    };
   } catch (error) {
     console.error('Error extracting file content:', error);
-    return `[Error extracting content from ${file.name}]`;
+    return {
+      text: `[Error extracting content from ${file.name}]`
+    };
   }
 };
 
 // New function to generate slides from content with character limits
-export const generateSlidesFromContent = (content: string, audience: string): any[] => {
+export const generateSlidesFromContent = (content: string, audience: string, documentTitle?: string): any[] => {
   // Split content into lines and filter out empty ones
   const lines = content.split('\n').filter(line => line.trim().length > 0);
   
-  // Extract title from first line or use filename
-  const title = lines[0] || "Document Presentation";
+  // Use document title or extract title from first line
+  const title = documentTitle || lines[0] || "Document Presentation";
   
   // Extract subtitle from second line or create a subtitle based on audience
   const subtitle = lines[1] || `Prepared for ${audience.charAt(0).toUpperCase() + audience.slice(1)} Audience`;
@@ -134,28 +180,22 @@ export const generateSlidesFromContent = (content: string, audience: string): an
     processedContent = processedContent.substring(0, 250) + "...";
   }
   
-  // Group remaining lines into content sections with character limits
+  // Extract key points for content sections
+  const keyPoints = extractKeyPoints(processedContent, 15, 150);
+  
+  // Group key points into content sections
   const contentSections: string[][] = [];
   let currentSection: string[] = [];
   
-  // Simple algorithm to group content into sections
-  // In a real implementation, this would use more sophisticated NLP
-  for (let i = 2; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Limit each content item to 150 characters
-    const limitedLine = line.length > 150 ? line.substring(0, 147) + "..." : line;
-    
-    // Try to identify potential section headers
-    if ((line.length < 50 && (line.endsWith(':') || !line.includes(' '))) || currentSection.length >= 4) {
+  keyPoints.forEach((point, index) => {
+    if (currentSection.length >= 4 || (index > 0 && index % 4 === 0)) {
       if (currentSection.length > 0) {
         contentSections.push([...currentSection]);
         currentSection = [];
       }
     }
-    
-    currentSection.push(limitedLine);
-  }
+    currentSection.push(point);
+  });
   
   // Add any remaining content as the final section
   if (currentSection.length > 0) {
@@ -191,7 +231,7 @@ export const generateSlidesFromContent = (content: string, audience: string): an
     slides.push({
       type: "content",
       title: (section[0].replace(':', '') || `Section ${index + 1}`).substring(0, 150),
-      content: section.slice(1, 5).map(item => item.substring(0, 150))
+      content: section.slice(0, 5).map(item => item.substring(0, 150))
     });
   });
   
