@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -34,6 +33,7 @@ const Dashboard = () => {
   const [progress, setProgress] = useState<number>(0);
   const { toast } = useToast();
   const [generatedSlides, setGeneratedSlides] = useState<any[]>([]);
+  const [lastDownloadTime, setLastDownloadTime] = useState<string | null>(null);
 
   const handleFileUpload = (uploadedFile: FileType) => {
     setFile(uploadedFile);
@@ -72,25 +72,43 @@ const Dashboard = () => {
       return;
     }
     
-    // Generate PowerPoint file
-    const pptxBlob = generatePowerPointFile(generatedSlides, theme, file.name);
-    
-    // Create download link
-    const url = URL.createObjectURL(pptxBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${file.name.split('.')[0]}_presentation.pptx`;
-    document.body.appendChild(a);
-    a.click();
-    
-    // Clean up
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    
-    toast({
-      title: "Presentation downloaded",
-      description: `${a.download} has been downloaded to your default download location.`,
-    });
+    try {
+      // Generate PowerPoint file
+      const pptxBlob = generatePowerPointFile(generatedSlides, theme, file.name);
+      
+      // Create download link
+      const url = URL.createObjectURL(pptxBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      // Use document title for file name if available
+      const baseFileName = file.documentTitle ? 
+        file.documentTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 
+        file.name.split('.')[0];
+      
+      a.download = `${baseFileName}_presentation.pptx`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      // Set download time for display
+      const now = new Date();
+      setLastDownloadTime(now.toLocaleTimeString());
+      
+      toast({
+        title: "Presentation downloaded",
+        description: `${a.download} has been downloaded to your default download location.`,
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download failed",
+        description: "There was an error generating your presentation. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getStepContent = () => {
@@ -131,14 +149,26 @@ const Dashboard = () => {
         return <ProcessingView progress={progress} />;
       case "preview":
         return (
-          <PresentationPreview 
-            file={file}
-            audience={audience}
-            theme={theme}
-            onThemeChange={handleThemeChange}
-            onDownload={handleDownload}
-            onSlidesGenerated={setGeneratedSlides}
-          />
+          <div className="space-y-4">
+            {lastDownloadTime && (
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg mb-4">
+                <p className="text-green-700 dark:text-green-400">
+                  <span className="font-medium">Last download:</span> {lastDownloadTime}
+                </p>
+                <p className="text-sm text-green-600 dark:text-green-500 mt-1">
+                  The file has been downloaded to your default download location.
+                </p>
+              </div>
+            )}
+            <PresentationPreview 
+              file={file}
+              audience={audience}
+              theme={theme}
+              onThemeChange={handleThemeChange}
+              onDownload={handleDownload}
+              onSlidesGenerated={setGeneratedSlides}
+            />
+          </div>
         );
       default:
         return <FileUpload onFileUpload={handleFileUpload} />;
@@ -203,18 +233,7 @@ const Dashboard = () => {
           </div>
           
           <div className="mb-8">
-            {currentStep === "preview" ? (
-              <PresentationPreview 
-                file={file}
-                audience={audience}
-                theme={theme}
-                onThemeChange={handleThemeChange}
-                onDownload={handleDownload}
-                onSlidesGenerated={setGeneratedSlides}
-              />
-            ) : (
-              getStepContent()
-            )}
+            {getStepContent()}
           </div>
         </div>
       </main>

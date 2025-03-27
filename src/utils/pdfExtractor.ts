@@ -54,31 +54,69 @@ export const extractPdfContentWithLimit = async (
 };
 
 /**
- * Extracts key points from PDF text
- * @param text The text to extract key points from
+ * Summarizes text into key points
+ * @param text The text to summarize
  * @param maxPoints Maximum number of key points to extract
  * @param charLimit Character limit per key point
  * @returns Array of key points
  */
-export const extractKeyPoints = (
+export const summarizeText = (
   text: string,
   maxPoints: number = 5,
   charLimit: number = 150
 ): string[] => {
-  // Simple extraction - split by sentences and get the first N
+  // Simple summarization - split by sentences and get the most important ones
+  // This is a basic implementation - for production, consider using an NLP API
   const sentences = text
     .replace(/([.?!])\s*(?=[A-Z])/g, '$1|')
     .split('|')
     .map(s => s.trim())
     .filter(s => s.length > 10);
   
-  // Limit the number of points and apply character limit
-  return sentences
+  // Get sentences that contain important keywords or are at the beginning/end
+  // This is a basic heuristic for important sentences
+  const importanceScores = sentences.map((sentence, index) => {
+    let score = 0;
+    
+    // Beginning sentences often contain important information
+    if (index < sentences.length * 0.2) {
+      score += 3;
+    }
+    
+    // Ending sentences often contain conclusions
+    if (index > sentences.length * 0.8) {
+      score += 2;
+    }
+    
+    // Sentences with keywords like "important", "key", "significant", etc.
+    const importantKeywords = [
+      "important", "key", "significant", "essential", "crucial", 
+      "primary", "main", "major", "fundamental", "critical",
+      "conclusion", "therefore", "thus", "result", "consequently"
+    ];
+    
+    importantKeywords.forEach(keyword => {
+      if (sentence.toLowerCase().includes(keyword)) {
+        score += 2;
+      }
+    });
+    
+    // Longer sentences might contain more information
+    score += Math.min(sentence.length / 50, 1);
+    
+    return { sentence, score };
+  });
+  
+  // Sort by importance score
+  const sortedSentences = importanceScores
+    .sort((a, b) => b.score - a.score)
     .slice(0, maxPoints)
-    .map(point => point.length > charLimit ? 
-      point.substring(0, charLimit - 3) + '...' : 
-      point
-    );
+    .map(item => item.sentence);
+  
+  // Apply character limit
+  return sortedSentences.map(point => 
+    point.length > charLimit ? point.substring(0, charLimit - 3) + '...' : point
+  );
 };
 
 /**
@@ -131,7 +169,7 @@ export const getDocumentTitle = (content: string): string => {
 
 export default {
   extractPdfContentWithLimit,
-  extractKeyPoints,
+  summarizeText,
   createTextFileFromExtractedContent,
   getDocumentTitle
 };

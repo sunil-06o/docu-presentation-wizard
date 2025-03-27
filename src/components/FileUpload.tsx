@@ -38,6 +38,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
   const processFile = async (file: File) => {
     setIsProcessing(true);
     try {
+      toast({
+        title: "Processing file",
+        description: "Extracting text from your document. This may take a moment...",
+      });
+      
       const extractionResult = await extractFileContent(file);
       const fileData: FileType = {
         name: file.name,
@@ -54,14 +59,14 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       if (extractionResult.downloadInfo) {
         toast({
           title: "Text extraction complete",
-          description: "Your document has been processed. You can download the extracted text.",
+          description: "Your document has been processed. The extracted text will be used to create your presentation.",
         });
       }
     } catch (error) {
       console.error("Error processing file:", error);
       toast({
         title: "Error processing file",
-        description: "There was a problem reading your file.",
+        description: "There was a problem reading your file. Please try another document.",
         variant: "destructive",
       });
       setIsProcessing(false);
@@ -79,7 +84,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
         processFile(file);
       }
     }
-  }, [toast]);
+  }, []);
 
   const validateFile = (file: File): boolean => {
     if (!validateFileType(file)) {
@@ -111,7 +116,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
         processFile(file);
       }
     }
-  }, [toast]);
+  }, []);
 
   const getFileIcon = (fileType: string) => {
     if (fileType.includes('pdf')) {
@@ -140,7 +145,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       
       toast({
         title: "Text file downloaded",
-        description: "The extracted text has been downloaded.",
+        description: "The extracted text has been downloaded to your default downloads folder.",
       });
     }
   };
@@ -148,7 +153,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
   return (
     <div className="w-full max-w-4xl mx-auto animate-fade-in">
       <div 
-        className={`drop-area p-12 ${dragActive ? 'active' : ''} bg-white dark:bg-gray-800 rounded-xl transition-all`}
+        className={`drop-area p-12 ${dragActive ? 'active border-primary' : ''} bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 transition-all hover:border-primary hover:bg-gray-50 dark:hover:bg-gray-750`}
         onDragEnter={handleDrag}
         onDragOver={handleDrag}
         onDragLeave={handleDrag}
@@ -191,6 +196,11 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
               {selectedFile.documentTitle && (
                 <p className="text-sm text-primary mt-1">
                   <span className="font-medium">Detected title:</span> {selectedFile.documentTitle}
+                </p>
+              )}
+              {selectedFile.content && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <span className="font-medium">Status:</span> Text extracted successfully
                 </p>
               )}
             </div>

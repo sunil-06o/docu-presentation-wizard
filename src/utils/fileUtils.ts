@@ -1,9 +1,10 @@
+
 // Import PDF.js library
 import * as pdfjs from 'pdfjs-dist';
 import { getDocument } from 'pdfjs-dist';
 import { 
   extractPdfContentWithLimit, 
-  extractKeyPoints, 
+  summarizeText, 
   createTextFileFromExtractedContent,
   getDocumentTitle
 } from './pdfExtractor';
@@ -163,31 +164,26 @@ export const extractFileContent = async (file: File): Promise<{
   }
 };
 
-// New function to generate slides from content with character limits
+// Generate slides from content with better summarization
 export const generateSlidesFromContent = (content: string, audience: string, documentTitle?: string): any[] => {
-  // Split content into lines and filter out empty ones
-  const lines = content.split('\n').filter(line => line.trim().length > 0);
+  // Split content into pages and paragraphs
+  const pages = content.split('---').filter(page => page.trim().length > 0);
   
-  // Use document title or extract title from first line
-  const title = documentTitle || lines[0] || "Document Presentation";
+  // Extract title from document title or first page
+  const title = documentTitle || getDocumentTitle(pages[0]) || "Document Presentation";
   
-  // Extract subtitle from second line or create a subtitle based on audience
-  const subtitle = lines[1] || `Prepared for ${audience.charAt(0).toUpperCase() + audience.slice(1)} Audience`;
+  // Create a subtitle based on audience
+  const subtitle = `Prepared for ${audience.charAt(0).toUpperCase() + audience.slice(1)} Audience`;
   
-  // Process content with character limits (max 250 chars per PDF page extract)
-  let processedContent = content;
-  if (processedContent.length > 250) {
-    processedContent = processedContent.substring(0, 250) + "...";
-  }
+  // Summarize the entire content
+  const fullText = pages.join(' ');
+  const summaryPoints = summarizeText(fullText, 15, 150);
   
-  // Extract key points for content sections
-  const keyPoints = extractKeyPoints(processedContent, 15, 150);
-  
-  // Group key points into content sections
+  // Group summary points into content sections
   const contentSections: string[][] = [];
   let currentSection: string[] = [];
   
-  keyPoints.forEach((point, index) => {
+  summaryPoints.forEach((point, index) => {
     if (currentSection.length >= 4 || (index > 0 && index % 4 === 0)) {
       if (currentSection.length > 0) {
         contentSections.push([...currentSection]);
@@ -204,42 +200,52 @@ export const generateSlidesFromContent = (content: string, audience: string, doc
   
   // Create additional sections if we don't have enough
   while (contentSections.length < 3) {
-    contentSections.push(["Additional content", "This section contains supplementary information", "Relevant to the main topic", "For further reference"]);
+    contentSections.push([
+      "Additional content from document",
+      "Supplementary information",
+      "Relevant points and observations",
+      "For further reference"
+    ]);
   }
   
-  // Generate slides based on the content
+  // Generate slides based on the summarized content
   const slides: any[] = [
     {
       type: "title",
       title: title.substring(0, 150),
-      subtitle: subtitle.substring(0, 150),
+      subtitle: subtitle,
     }
   ];
   
-  // Add agenda slide
+  // Add agenda slide with meaningful section titles
+  const sectionTitles = contentSections.map((section, index) => {
+    // Try to create a meaningful title from the first point
+    const firstPoint = section[0];
+    // Extract first few words for a title
+    const words = firstPoint.split(' ').slice(0, 4).join(' ');
+    return words || `Section ${index + 1}`;
+  });
+  
   slides.push({
     type: "agenda",
     title: "Agenda",
-    items: contentSections.map((section, index) => {
-      const headerText = section[0].replace(':', '') || `Section ${index + 1}`;
-      return headerText.substring(0, 150);
-    }).slice(0, 5)
+    items: sectionTitles.slice(0, 5).map(title => title.substring(0, 150))
   });
   
   // Add content slides
   contentSections.forEach((section, index) => {
     slides.push({
       type: "content",
-      title: (section[0].replace(':', '') || `Section ${index + 1}`).substring(0, 150),
-      content: section.slice(0, 5).map(item => item.substring(0, 150))
+      title: sectionTitles[index].substring(0, 150),
+      content: section.map(item => item.substring(0, 150))
     });
   });
   
-  // Add a chart slide if we have space
+  // Add a chart slide if we have space (for data visualization)
   if (slides.length < 5) {
     slides.push({
       type: "chart",
-      title: "Data Visualization",
+      title: "Key Data Points",
       chartType: "bar"
     });
   }
@@ -282,7 +288,7 @@ export const generateSlidesFromContent = (content: string, audience: string, doc
   return slides;
 };
 
-// Function to generate a PowerPoint file (in a real implementation)
+// Improved function to generate a PowerPoint file (still simulated)
 export const generatePowerPointFile = (slides: any[], theme: string, fileName: string): Blob => {
   // This is a simplified version - in a real implementation, you would use a library like pptxgenjs
   
@@ -299,15 +305,23 @@ export const generatePowerPointFile = (slides: any[], theme: string, fileName: s
     }
     
     if (slide.content) {
-      slideContent += `Content: ${slide.content.join(', ')}\n`;
+      slideContent += `Content: ${slide.content.join('\n- ')}\n`;
     }
     
     if (slide.items) {
-      slideContent += `Items: ${slide.items.join(', ')}\n`;
+      slideContent += `Items: ${slide.items.join('\n- ')}\n`;
     }
     
     return slideContent;
   }).join('\n\n');
   
-  return new Blob([content], { type: 'text/plain' });
+  const summaryInfo = `
+Presentation Summary:
+Title: ${slides[0].title || "Untitled Presentation"}
+Theme: ${theme}
+Total Slides: ${slides.length}
+Generated from: ${fileName}
+  `;
+  
+  return new Blob([summaryInfo, '\n\n', content], { type: 'text/plain' });
 };
