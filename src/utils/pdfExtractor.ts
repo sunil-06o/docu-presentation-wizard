@@ -123,11 +123,13 @@ export const summarizeText = (
  * Creates a downloadable text file from extracted PDF content
  * @param extractedPages Array of extracted pages with text
  * @param fileName Original file name
+ * @param saveAs Whether to trigger a save-as dialog
  * @returns Object with download URL and file name
  */
 export const createTextFileFromExtractedContent = (
   extractedPages: ExtractedPage[],
-  fileName: string
+  fileName: string,
+  saveAs: boolean = true
 ): { url: string, fileName: string } => {
   const content = extractedPages.map(page => 
     `--- Page ${page.pageNumber} ---\n${page.text}`
@@ -137,10 +139,88 @@ export const createTextFileFromExtractedContent = (
   const url = URL.createObjectURL(blob);
   const textFileName = fileName.split('.')[0] + '_extracted.txt';
   
+  if (saveAs) {
+    // Use the File System Access API if available
+    if ('showSaveFilePicker' in window) {
+      // We'll initiate the save dialog when the user clicks the download button
+      // This is handled in the component that calls this function
+    } else {
+      // Fallback for browsers without File System Access API
+      // The default browser download behavior will be used
+    }
+  }
+  
   return { 
     url, 
     fileName: textFileName 
   };
+};
+
+/**
+ * Saves a file using the File System Access API with a custom location
+ * @param url The object URL for the blob
+ * @param suggestedName Suggested file name
+ * @param mimeType MIME type of the file
+ * @returns Promise resolving to true if successful
+ */
+export const saveFileWithCustomLocation = async (
+  url: string,
+  suggestedName: string,
+  mimeType: string = 'text/plain'
+): Promise<boolean> => {
+  try {
+    // Check if File System Access API is supported
+    if (!('showSaveFilePicker' in window)) {
+      // Fallback for browsers without API support
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = suggestedName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return true;
+    }
+    
+    // @ts-ignore - TypeScript might not have the type definitions for this API
+    const fileHandle = await window.showSaveFilePicker({
+      suggestedName,
+      types: [{
+        description: 'Text Files',
+        accept: { [mimeType]: [`.${suggestedName.split('.').pop()}`] },
+      }],
+    });
+    
+    // Get a writable stream
+    // @ts-ignore
+    const writable = await fileHandle.createWritable();
+    
+    // Fetch the blob from the URL
+    const response = await fetch(url);
+    const blob = await response.blob();
+    
+    // Write the blob to the file
+    await writable.write(blob);
+    await writable.close();
+    
+    // Clean up the object URL
+    URL.revokeObjectURL(url);
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving file with custom location:', error);
+    
+    // If user cancelled or API failed, fall back to standard download
+    if (error.name !== 'AbortError') {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = suggestedName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    
+    return false;
+  }
 };
 
 /**
@@ -171,5 +251,6 @@ export default {
   extractPdfContentWithLimit,
   summarizeText,
   createTextFileFromExtractedContent,
+  saveFileWithCustomLocation,
   getDocumentTitle
 };

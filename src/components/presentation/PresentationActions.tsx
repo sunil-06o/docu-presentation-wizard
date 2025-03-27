@@ -83,7 +83,7 @@ const PresentationActions: React.FC<PresentationActionsProps> = ({
         onClick={onDownload}
       >
         <Download className="h-4 w-4 mr-1" />
-        Download
+        Save Presentation
       </Button>
     </div>
   );

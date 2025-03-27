@@ -1,9 +1,9 @@
-
 import React, { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { FileText, Upload, File, Download } from "lucide-react";
 import { validateFileType, validateFileSize, formatFileSize, extractFileContent } from "@/utils/fileUtils";
+import { saveFileWithCustomLocation } from "@/utils/pdfExtractor";
 
 type FileType = {
   name: string;
@@ -133,20 +133,30 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
       onFileUpload(selectedFile);
     }
   };
-  
-  const handleDownloadExtractedText = () => {
+
+  const handleDownloadExtractedText = async () => {
     if (selectedFile?.textFileUrl) {
-      const a = document.createElement('a');
-      a.href = selectedFile.textFileUrl;
-      a.download = selectedFile.textFileName || 'extracted_text.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      toast({
-        title: "Text file downloaded",
-        description: "The extracted text has been downloaded to your default downloads folder.",
-      });
+      try {
+        const success = await saveFileWithCustomLocation(
+          selectedFile.textFileUrl,
+          selectedFile.textFileName || 'extracted_text.txt',
+          'text/plain'
+        );
+        
+        if (success) {
+          toast({
+            title: "Text file saved",
+            description: "The extracted text has been saved to your selected location.",
+          });
+        }
+      } catch (error) {
+        console.error("Error saving file:", error);
+        toast({
+          title: "Error saving file",
+          description: "There was a problem saving your file. The file may have been downloaded to your default location.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -213,7 +223,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileUpload }) => {
                   size="sm"
                 >
                   <Download className="h-4 w-4" />
-                  <span>Extracted Text</span>
+                  <span>Save Extracted Text</span>
                 </Button>
               )}
               <Button
